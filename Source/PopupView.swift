@@ -22,7 +22,7 @@ extension View {
         closeOnTapOutside: Bool = false,
         backgroundColor: Color = Color.clear,
         dismissCallback: @escaping () -> () = {},
-        @ViewBuilder view: @escaping () -> PopupContent) -> some View {
+        @ViewBuilder view: @escaping (Item) -> PopupContent) -> some View {
             self.modifier(
                 Popup(
                     item: item,
@@ -35,37 +35,10 @@ extension View {
                     closeOnTapOutside: closeOnTapOutside,
                     backgroundColor: backgroundColor,
                     dismissCallback: dismissCallback,
-                    view: view)
+                    view: view
+                )
             )
         }
-
-    public func popup<PopupContent: View>(
-        isPresented: Binding<Bool>,
-        type: Popup<Int, PopupContent>.PopupType = .`default`,
-        position: Popup<Int, PopupContent>.Position = .bottom,
-        animation: Animation = Animation.easeOut(duration: 0.3),
-        autohideIn: Double? = nil,
-        dragToDismiss: Bool = true,
-        closeOnTap: Bool = true,
-        closeOnTapOutside: Bool = false,
-        backgroundColor: Color = Color.clear,
-        dismissCallback: @escaping () -> () = {},
-        @ViewBuilder view: @escaping () -> PopupContent) -> some View {
-        self.modifier(
-            Popup<Int, PopupContent>(
-                isPresented: isPresented,
-                type: type,
-                position: position,
-                animation: animation,
-                autohideIn: autohideIn,
-                dragToDismiss: dragToDismiss,
-                closeOnTap: closeOnTap,
-                closeOnTapOutside: closeOnTapOutside,
-                backgroundColor: backgroundColor,
-                dismissCallback: dismissCallback,
-                view: view)
-        )
-    }
 
     @ViewBuilder
     func applyIf<T: View>(_ condition: Bool, apply: (Self) -> T) -> some View {
@@ -95,33 +68,6 @@ extension View {
 }
 
 public struct Popup<Item: Equatable, PopupContent: View>: ViewModifier {
-    
-    init(isPresented: Binding<Bool>,
-         type: PopupType,
-         position: Position,
-         animation: Animation,
-         autohideIn: Double?,
-         dragToDismiss: Bool,
-         closeOnTap: Bool,
-         closeOnTapOutside: Bool,
-         backgroundColor: Color,
-         dismissCallback: @escaping () -> (),
-         view: @escaping () -> PopupContent) {
-        self._isPresented = isPresented
-        self._item = .constant(nil)
-        self.type = type
-        self.position = position
-        self.animation = animation
-        self.autohideIn = autohideIn
-        self.dragToDismiss = dragToDismiss
-        self.closeOnTap = closeOnTap
-        self.closeOnTapOutside = closeOnTapOutside
-        self.backgroundColor = backgroundColor
-        self.dismissCallback = dismissCallback
-        self.view = view
-        self.isPresentedRef = ClassReference(self.$isPresented)
-        self.itemRef = ClassReference(self.$item)
-    }
 
     init(item: Binding<Item?>,
          type: PopupType,
@@ -133,7 +79,7 @@ public struct Popup<Item: Equatable, PopupContent: View>: ViewModifier {
          closeOnTapOutside: Bool,
          backgroundColor: Color,
          dismissCallback: @escaping () -> (),
-         view: @escaping () -> PopupContent) {
+         view: @escaping (Item) -> PopupContent) {
         self._isPresented = .constant(false)
         self._item = item
         self.type = type
@@ -227,7 +173,7 @@ public struct Popup<Item: Equatable, PopupContent: View>: ViewModifier {
     /// is called on any close action
     var dismissCallback: () -> ()
 
-    var view: () -> PopupContent
+    var view: (Item) -> PopupContent
 
     /// holder for autohiding dispatch work (to be able to cancel it when needed)
     var dispatchWorkHolder = DispatchWorkHolder()
@@ -385,13 +331,17 @@ public struct Popup<Item: Equatable, PopupContent: View>: ViewModifier {
         }
 
         let sheet = ZStack {
-            self.view()
-                .addTapIfNotTV(if: closeOnTap) {
-                    dismiss()
-                }
-                .frameGetter($sheetContentRect, $sheetSafeArea)
-                .offset(x: 0, y: currentOffset)
-                .animation(animation)
+            if let item = item {
+                self.view(item)
+                    .addTapIfNotTV(if: closeOnTap) {
+                        dismiss()
+                    }
+                    .frameGetter($sheetContentRect, $sheetSafeArea)
+                    .offset(x: 0, y: currentOffset)
+                    .animation(animation)
+            } else {
+                EmptyView()
+            }
         }
 
         #if !os(tvOS)
